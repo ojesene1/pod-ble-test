@@ -1,0 +1,13 @@
+# Rust build output (large, machine-specific)
+target/
+
+# Python
+__pycache__/
+
+# Editors / OS
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

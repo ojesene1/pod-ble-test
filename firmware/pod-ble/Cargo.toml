@@ -1,0 +1,55 @@
+[package]
+name = "pod-ble"
+version = "0.1.0"
+edition = "2021"
+description = "BLE peripheral firmware for the WB pod (nRF54L15): Step Record Service"
+publish = false
+
+# Dependency set mirrors TrouBLE's nRF54 example (embassy-rs/trouble, examples/nrf54),
+# which is built in upstream CI. Upgrade these together, not one crate at a time.
+[dependencies]
+pod-protocol = { path = "../pod-protocol" }
+
+embassy-executor = { version = "0.10", default-features = false, features = ["platform-cortex-m", "executor-thread", "executor-interrupt", "defmt"] }
+embassy-time = { version = "0.5", default-features = false, features = ["defmt", "defmt-timestamp-uptime"] }
+embassy-nrf = { version = "0.11", default-features = false, features = ["nrf54l15-app-s", "defmt", "time-driver-grtc", "gpiote", "unstable-pac", "rt"] }
+embassy-futures = "0.1.1"
+embassy-sync = { version = "0.8", features = ["defmt"] }
+
+# Nordic SoftDevice Controller (link layer) + MPSL, wrapped for Rust
+nrf-sdc = { version = "0.4", default-features = false, features = ["nrf54l15-app-s", "defmt", "peripheral", "central"] }
+nrf-mpsl = { version = "0.3", default-features = false, features = ["defmt", "critical-section-impl"] }
+bt-hci = { version = "0.10", default-features = false, features = ["defmt"] }
+
+# TrouBLE: async BLE host stack (GAP/GATT) on top of the controller
+trouble-host = { version = "0.8", default-features = false, features = ["derive", "gatt", "peripheral", "default-packet-pool", "defmt"] }
+
+defmt = "1.0"
+defmt-rtt = "1.0"
+panic-probe = { version = "1.0", features = ["print-defmt"] }
+cortex-m = "0.7.6"
+cortex-m-rt = "0.7.0"
+static_cell = "2"
+
+[features]
+default = ["simulate-steps"]
+# Emit a fake step record every second so the app can be developed before the
+# insole and sensor pipeline exist. Build without it: --no-default-features
+simulate-steps = []
+
+[profile.release]
+debug = 2
+
+# Pinned git revisions (same as the upstream example) because the nRF54L15
+# support in embassy-nrf / nrf-sdc is newer than their latest crates.io releases.
+[patch.crates-io]
+embassy-executor = { git = "https://github.com/embassy-rs/embassy.git", rev = "3cd51e6d8eb6aff8b0d64d9e56a75a538bcfc65a" }
+embassy-nrf = { git = "https://github.com/embassy-rs/embassy.git", rev = "3cd51e6d8eb6aff8b0d64d9e56a75a538bcfc65a" }
+embassy-sync = { git = "https://github.com/embassy-rs/embassy.git", rev = "3cd51e6d8eb6aff8b0d64d9e56a75a538bcfc65a" }
+embassy-futures = { git = "https://github.com/embassy-rs/embassy.git", rev = "3cd51e6d8eb6aff8b0d64d9e56a75a538bcfc65a" }
+embassy-time = { git = "https://github.com/embassy-rs/embassy.git", rev = "3cd51e6d8eb6aff8b0d64d9e56a75a538bcfc65a" }
+embassy-time-driver = { git = "https://github.com/embassy-rs/embassy.git", rev = "3cd51e6d8eb6aff8b0d64d9e56a75a538bcfc65a" }
+embassy-embedded-hal = { git = "https://github.com/embassy-rs/embassy.git", rev = "3cd51e6d8eb6aff8b0d64d9e56a75a538bcfc65a" }
+nrf-sdc = { git = "https://github.com/alexmoon/nrf-sdc.git", rev = "1a6e661155cdd1d6a86f3ae7b7fb117343781533" }
+nrf-mpsl = { git = "https://github.com/alexmoon/nrf-sdc.git", rev = "1a6e661155cdd1d6a86f3ae7b7fb117343781533" }
+trouble-host = { git = "https://github.com/embassy-rs/trouble.git", rev = "b68acf0fd6c0fdab13af1f4cdbf449b4e4fc36f0" }

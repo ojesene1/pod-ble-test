@@ -1,0 +1,4 @@
+# Normalise line endings (team works across Windows, macOS and Linux)
+* text=auto
+*.bat text eol=crlf
+*.sh text eol=lf

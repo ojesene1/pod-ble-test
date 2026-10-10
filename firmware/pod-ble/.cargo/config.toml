@@ -1,0 +1,9 @@
+[target.'cfg(all(target_arch = "arm", target_os = "none"))']
+# `cargo run` flashes the board over the DK's on-board J-Link and streams defmt logs.
+runner = "probe-rs run --chip nRF54L15"
+
+[build]
+target = "thumbv8m.main-none-eabihf"
+
+[env]
+DEFMT_LOG = "info"

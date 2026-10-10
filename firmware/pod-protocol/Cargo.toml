@@ -1,0 +1,10 @@
+[package]
+name = "pod-protocol"
+version = "0.1.0"
+edition = "2021"
+description = "On-air data formats for the pod <-> app BLE link (see protocol/GATT.md)"
+publish = false
+
+# Deliberately zero dependencies and no_std: this crate builds for the nRF54L15
+# and for the host, so `cargo test` runs the protocol tests on any laptop.
+[dependencies]
