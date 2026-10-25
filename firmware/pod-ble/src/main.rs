@@ -8,6 +8,7 @@
 #![no_main]
 
 mod ble;
+mod sensor;
 mod steps;
 
 use defmt::unwrap;
@@ -26,6 +27,7 @@ bind_interrupts!(struct Irqs {
     RADIO_0 => nrf_sdc::mpsl::HighPrioInterruptHandler;
     TIMER10 => nrf_sdc::mpsl::HighPrioInterruptHandler;
     GRTC_3 => nrf_sdc::mpsl::HighPrioInterruptHandler;
+    SAADC => embassy_nrf::saadc::InterruptHandler;
 });
 
 /// Outgoing / incoming L2CAP buffers per link.
@@ -130,6 +132,10 @@ async fn main(spawner: Spawner) {
         defmt::info!("simulated steps enabled");
         spawner.spawn(unwrap!(steps::simulate()));
     }
+
+    // FSR 400 force sensor on P1.11 (see sensor.rs for the wiring)
+    let sensor = sensor::Sensor::new(p.SAADC, p.P1_11, Irqs).await;
+    spawner.spawn(unwrap!(sensor::run(sensor)));
 
     ble::run(sdc, device_address()).await;
 }
