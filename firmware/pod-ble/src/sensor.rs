@@ -39,6 +39,7 @@ use embassy_nrf::peripherals::{P1_11, SAADC};
 use embassy_nrf::saadc::{self, ChannelConfig, Config, Oversample, Saadc, Time};
 use embassy_nrf::Peri;
 use embassy_time::{Duration, Ticker};
+use pod_protocol::StepRecord;
 
 /// Supply voltage of the divider, mV. TODO: confirm for your board (or measure it).
 const VDD_MV: u32 = 3300;
@@ -52,6 +53,8 @@ const COUNTS: u32 = 4096;
 const SAMPLE_PERIOD: Duration = Duration::from_millis(10); // 100 Hz
 /// Print one line every this many samples (10 -> 10 lines per second).
 const PRINT_EVERY: u32 = 10;
+/// Send one BLE record every this many samples (50 -> 2 per second).
+const BLE_EVERY: u32 = 50;
 
 /// (resistance in ohms, force in grams), read off the datasheet's typical curve (Fig. 1).
 /// Approximate, sorted by falling resistance. TODO: replace with your own calibration
@@ -158,27 +161,59 @@ fn force_dn(ohms: u32) -> u16 {
     (force_g(ohms) * 0.0981) as u16
 }
 
-/// Samples the sensor and prints every reading to the terminal (defmt/RTT) at 10 Hz.
-/// TODO: detect steps (threshold + peak/impulse/stance timing), then build a
-/// `pod_protocol::StepRecord` and hand it over with `crate::steps::push(..)`.
+/// Samples the sensor, prints every reading to the terminal (defmt/RTT) at 10 Hz and sends one
+/// reading to the phone over BLE at 2 Hz.
+///
+/// BLE debug mapping: the Step Record characteristic is reused to carry raw sensor values, so
+/// nRF Connect shows the same numbers as the terminal. The record's field names do not apply:
+///   peak_force_dn    = force, 0.1 N units          (decoders show it correctly as N)
+///   peak_bw_permille = voltage at the pin, mV      (decoders mislabel it "% body weight x10")
+///   impulse_dns      = FSR resistance, ohm         (65535 = open / unloaded)
+///   stance_ms        = raw ADC counts
+///   heel_pct         = 0
+/// TODO: replace with step detection and real `StepRecord`s once the sensor data is trusted.
 #[embassy_executor::task]
 pub async fn run(mut sensor: Sensor) -> ! {
     let mut ticker = Ticker::every(SAMPLE_PERIOD);
     let mut n: u32 = 0;
+    let mut seq: u32 = 0;
     loop {
         ticker.next().await;
         let raw = sensor.read_raw().await;
         n = n.wrapping_add(1);
-        if n % PRINT_EVERY == 0 {
-            let mv = u32::from(raw) * FULL_SCALE_MV / COUNTS;
+        let print = n % PRINT_EVERY == 0;
+        let send = n % BLE_EVERY == 0;
+        if !print && !send {
+            continue;
+        }
+
+        let mv = u32::from(raw) * FULL_SCALE_MV / COUNTS;
+        let ohms = fsr_ohms(mv);
+
+        if print {
             // Columns: force (N), resistance (ohm), voltage (mV), raw ADC counts.
-            match fsr_ohms(mv) {
+            match ohms {
                 Some(ohms) => {
                     let newtons = ((force_n(ohms) * 1000.0 + 0.5) as u32) as f32 / 1000.0;
                     defmt::info!("{=f32} N, {} ohm, {} mV, {}", newtons, ohms, mv, raw)
                 }
                 None => defmt::info!("0 N, open, {} mV, {}", mv, raw),
             }
+        }
+
+        if send {
+            let (timestamp_s, synced) = crate::steps::now();
+            crate::steps::push(StepRecord {
+                seq,
+                timestamp_s,
+                peak_force_dn: ohms.map_or(0, force_dn),
+                peak_bw_permille: mv as u16,
+                impulse_dns: ohms.map_or(u16::MAX, |o| o.min(u32::from(u16::MAX)) as u16),
+                stance_ms: raw,
+                heel_pct: 0,
+                flags: if synced { StepRecord::FLAG_TIME_SYNCED } else { 0 },
+            });
+            seq = seq.wrapping_add(1);
         }
     }
 }

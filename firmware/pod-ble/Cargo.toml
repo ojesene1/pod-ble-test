@@ -32,9 +32,9 @@ cortex-m-rt = "0.7.0"
 static_cell = "2"
 
 [features]
-default = ["simulate-steps"]
-# Emit a fake step record every second so the app can be developed before the
-# insole and sensor pipeline exist. Build without it: --no-default-features
+default = []
+# Emit a fake step record every second, for app development without the sensor. Off by default:
+# the sensor task sends real readings. Enable with: --features simulate-steps
 simulate-steps = []
 
 [profile.release]
